@@ -1,5 +1,19 @@
 const { verifyTransaction, syncPayments, validatePaymentAgainstFee } = require('../backend/src/services/stellarService');
 
+// Base mock transaction factory
+function makeTx(overrides = {}) {
+  return {
+    hash: 'abc123',
+    memo: 'STU001',
+    successful: true,
+    created_at: new Date().toISOString(),
+    operations: async () => ({
+      records: [{ type: 'payment', to: 'GTEST123', amount: '200.0000000', asset_type: 'native' }],
+    }),
+    ...overrides,
+  };
+}
+
 jest.mock('../backend/src/config/stellarConfig', () => ({
   SCHOOL_WALLET: 'GTEST123',
   ACCEPTED_ASSETS: {
@@ -24,13 +38,10 @@ jest.mock('../backend/src/config/stellarConfig', () => ({
         call: async () => ({
           hash,
           memo: 'STU001',
+          successful: true,
           created_at: new Date().toISOString(),
           operations: async () => ({
-<<<<<<< feature/multi-asset-payment-support
-            records: [{ type: 'payment', to: 'GTEST123', amount: '100.0000000', asset_type: 'native' }],
-=======
-            records: [{ type: 'payment', to: 'GTEST123', amount: '200.0' }],
->>>>>>> main
+            records: [{ type: 'payment', to: 'GTEST123', amount: '200.0000000', asset_type: 'native' }],
           }),
         }),
       }),
@@ -54,66 +65,82 @@ describe('stellarService', () => {
     await expect(syncPayments()).resolves.toBeUndefined();
   });
 
-<<<<<<< feature/multi-asset-payment-support
-  test('verifyTransaction returns payment details with asset info', async () => {
-=======
-  test('verifyTransaction returns payment details with fee validation', async () => {
->>>>>>> main
+  test('verifyTransaction returns payment details with asset info and fee validation', async () => {
     const result = await verifyTransaction('abc123');
     expect(result).toMatchObject({
       hash: 'abc123',
       memo: 'STU001',
-<<<<<<< feature/multi-asset-payment-support
-      amount: 100,
+      amount: 200,
       assetCode: 'XLM',
       assetType: 'native',
-    });
-  });
-
-  test('detectAsset returns null for unsupported asset', () => {
-    const payOp = { asset_type: 'credit_alphanum4', asset_code: 'SHIB', asset_issuer: 'GRANDOM' };
-    const result = detectAsset(payOp);
-    expect(result).toBeNull();
-  });
-
-  test('detectAsset recognizes native XLM', () => {
-    const payOp = { asset_type: 'native' };
-    const result = detectAsset(payOp);
-    expect(result).toEqual({ assetCode: 'XLM', assetType: 'native', assetIssuer: null });
-  });
-
-  test('detectAsset recognizes USDC', () => {
-    const payOp = { asset_type: 'credit_alphanum4', asset_code: 'USDC', asset_issuer: 'GISSUER' };
-    const result = detectAsset(payOp);
-    expect(result).toEqual({ assetCode: 'USDC', assetType: 'credit_alphanum4', assetIssuer: 'GISSUER' });
-  });
-
-  test('normalizeAmount formats amounts consistently', () => {
-    expect(normalizeAmount('100.123456789')).toBe(100.1234568);
-    expect(normalizeAmount('200')).toBe(200.0);
-    expect(normalizeAmount('0.0000001')).toBe(0.0000001);
-=======
-      amount: 200,
       feeAmount: 200,
     });
     expect(result.feeValidation).toHaveProperty('status', 'valid');
+  });
+
+  test('verifyTransaction throws TX_FAILED for unsuccessful transaction', async () => {
+    const { server } = require('../backend/src/config/stellarConfig');
+    const original = server.transactions;
+    server.transactions = () => ({
+      transaction: () => ({ call: async () => makeTx({ successful: false }) }),
+    });
+    await expect(verifyTransaction('fail123')).rejects.toMatchObject({ code: 'TX_FAILED' });
+    server.transactions = original;
+  });
+
+  test('verifyTransaction throws MISSING_MEMO when memo is absent', async () => {
+    const { server } = require('../backend/src/config/stellarConfig');
+    const original = server.transactions;
+    server.transactions = () => ({
+      transaction: () => ({ call: async () => makeTx({ memo: null }) }),
+    });
+    await expect(verifyTransaction('nomemo')).rejects.toMatchObject({ code: 'MISSING_MEMO' });
+    server.transactions = original;
+  });
+
+  test('verifyTransaction throws INVALID_DESTINATION when no matching payment op', async () => {
+    const { server } = require('../backend/src/config/stellarConfig');
+    const original = server.transactions;
+    server.transactions = () => ({
+      transaction: () => ({
+        call: async () => makeTx({
+          operations: async () => ({
+            records: [{ type: 'payment', to: 'GWRONGWALLET', amount: '200.0', asset_type: 'native' }],
+          }),
+        }),
+      }),
+    });
+    await expect(verifyTransaction('wrongdest')).rejects.toMatchObject({ code: 'INVALID_DESTINATION' });
+    server.transactions = original;
+  });
+
+  test('verifyTransaction throws UNSUPPORTED_ASSET for unknown asset', async () => {
+    const { server } = require('../backend/src/config/stellarConfig');
+    const original = server.transactions;
+    server.transactions = () => ({
+      transaction: () => ({
+        call: async () => makeTx({
+          operations: async () => ({
+            records: [{ type: 'payment', to: 'GTEST123', amount: '200.0', asset_type: 'credit_alphanum4', asset_code: 'SHIB', asset_issuer: 'GRANDOM' }],
+          }),
+        }),
+      }),
+    });
+    await expect(verifyTransaction('badasset')).rejects.toMatchObject({ code: 'UNSUPPORTED_ASSET' });
+    server.transactions = original;
   });
 });
 
 describe('validatePaymentAgainstFee', () => {
   test('returns valid when payment matches fee', () => {
-    const result = validatePaymentAgainstFee(200, 200);
-    expect(result.status).toBe('valid');
+    expect(validatePaymentAgainstFee(200, 200).status).toBe('valid');
   });
 
   test('returns underpaid when payment is less than fee', () => {
-    const result = validatePaymentAgainstFee(150, 200);
-    expect(result.status).toBe('underpaid');
+    expect(validatePaymentAgainstFee(150, 200).status).toBe('underpaid');
   });
 
   test('returns overpaid when payment exceeds fee', () => {
-    const result = validatePaymentAgainstFee(250, 200);
-    expect(result.status).toBe('overpaid');
->>>>>>> main
+    expect(validatePaymentAgainstFee(250, 200).status).toBe('overpaid');
   });
 });

@@ -76,14 +76,45 @@ async function syncPayments() {
 // Verify a single transaction hash against the school wallet
 async function verifyTransaction(txHash) {
   const tx = await server.transactions().transaction(txHash).call();
+
+  // 1. Validate transaction success status
+  if (tx.successful === false) {
+    const err = new Error('Transaction was not successful on the Stellar network');
+    err.code = 'TX_FAILED';
+    throw err;
+  }
+
+  // 2. Extract and validate memo (student ID)
+  const memo = tx.memo ? tx.memo.trim() : null;
+  if (!memo) {
+    const err = new Error('Transaction memo is missing or empty — cannot identify student');
+    err.code = 'MISSING_MEMO';
+    throw err;
+  }
+
+  // 3. Confirm a payment operation exists and destination matches school wallet
   const ops = await tx.operations();
   const payOp = ops.records.find(op => op.type === 'payment' && op.to === SCHOOL_WALLET);
-  if (!payOp) return null;
+  if (!payOp) {
+    const err = new Error(`No payment operation found targeting the school wallet (${SCHOOL_WALLET})`);
+    err.code = 'INVALID_DESTINATION';
+    throw err;
+  }
 
-  const amount = parseFloat(payOp.amount);
+  // 4. Validate asset type
+  const asset = detectAsset(payOp);
+  if (!asset) {
+    const assetCode = payOp.asset_type === 'native' ? 'XLM' : (payOp.asset_code || payOp.asset_type);
+    const err = new Error(`Unsupported asset: ${assetCode}`);
+    err.code = 'UNSUPPORTED_ASSET';
+    err.assetCode = assetCode;
+    throw err;
+  }
 
-  // Look up the student to validate against their fee
-  const student = await Student.findOne({ studentId: tx.memo });
+  const amount = normalizeAmount(payOp.amount);
+
+  // 5. Look up the student to validate against their fee
+  const student = await Student.findOne({ studentId: memo });
   const feeAmount = student ? student.feeAmount : null;
   const feeValidation = feeAmount != null
     ? validatePaymentAgainstFee(amount, feeAmount)
@@ -91,8 +122,10 @@ async function verifyTransaction(txHash) {
 
   return {
     hash: tx.hash,
-    memo: tx.memo,
+    memo,
     amount,
+    assetCode: asset.assetCode,
+    assetType: asset.assetType,
     feeAmount,
     feeValidation,
     date: tx.created_at,

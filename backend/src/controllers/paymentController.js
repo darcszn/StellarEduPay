@@ -25,16 +25,19 @@ async function getPaymentInstructions(req, res) {
 async function verifyPayment(req, res) {
   try {
     const { txHash } = req.body;
+    if (!txHash) return res.status(400).json({ error: 'txHash is required' });
     const result = await verifyTransaction(txHash);
-    if (!result) return res.status(404).json({ error: 'Payment not found or invalid' });
-    if (result.error === 'unsupported_asset') {
-      return res.status(400).json({
-        error: `Unsupported asset: ${result.assetCode}. Accepted assets: ${Object.keys(ACCEPTED_ASSETS).join(', ')}`,
-      });
-    }
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const clientErrors = {
+      TX_FAILED: 400,
+      MISSING_MEMO: 400,
+      INVALID_DESTINATION: 400,
+      UNSUPPORTED_ASSET: 400,
+    };
+    const status = clientErrors[err.code] || 500;
+    console.error(`[verifyPayment] ${err.code || 'ERROR'}: ${err.message}`);
+    res.status(status).json({ error: err.message, code: err.code || 'INTERNAL_ERROR' });
   }
 }
 
