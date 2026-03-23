@@ -2,13 +2,21 @@ const Payment = require('../models/paymentModel');
 const { syncPayments, verifyTransaction, recordPayment } = require('../services/stellarService');
 const { SCHOOL_WALLET, ACCEPTED_ASSETS } = require('../config/stellarConfig');
 
+// Tag errors that originate from Stellar network calls
+function wrapStellarError(err) {
+  if (!err.code) {
+    err.code = 'STELLAR_NETWORK_ERROR';
+    err.message = `Stellar network error: ${err.message}`;
+  }
+  return err;
+}
+
 // GET /api/payments/instructions/:studentId
-async function getPaymentInstructions(req, res) {
+async function getPaymentInstructions(req, res, next) {
   try {
-    const { studentId } = req.params;
     res.json({
       walletAddress: SCHOOL_WALLET,
-      memo: studentId,
+      memo: req.params.studentId,
       acceptedAssets: Object.values(ACCEPTED_ASSETS).map(a => ({
         code: a.code,
         type: a.type,
@@ -17,38 +25,38 @@ async function getPaymentInstructions(req, res) {
       note: 'Include the student ID exactly as the memo when sending payment. Only the listed assets are accepted.',
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 }
 
 // POST /api/payments/verify
-async function verifyPayment(req, res) {
+async function verifyPayment(req, res, next) {
   try {
     const { txHash } = req.body;
-    if (!txHash) return res.status(400).json({ error: 'txHash is required' });
+    if (!txHash) {
+      const err = new Error('txHash is required');
+      err.code = 'VALIDATION_ERROR';
+      return next(err);
+    }
 
-    // Reject duplicates before hitting the Stellar network
     const existing = await Payment.findOne({ txHash });
     if (existing) {
-      return res.status(409).json({
-        error: `Transaction ${txHash} has already been processed`,
-        code: 'DUPLICATE_TX',
-      });
+      const err = new Error(`Transaction ${txHash} has already been processed`);
+      err.code = 'DUPLICATE_TX';
+      return next(err);
     }
 
     let result;
     try {
       result = await verifyTransaction(txHash);
     } catch (err) {
-      // Blockchain-level failures — record as failed then surface the error
       const failCodes = ['TX_FAILED', 'MISSING_MEMO', 'INVALID_DESTINATION', 'UNSUPPORTED_ASSET'];
       if (failCodes.includes(err.code)) {
         await Payment.create({ studentId: 'unknown', txHash, amount: 0, status: 'failed' }).catch(() => {});
       }
-      throw err;
+      return next(failCodes.includes(err.code) ? err : wrapStellarError(err));
     }
 
-    // Persist the verified payment as confirmed
     await recordPayment({
       studentId: result.memo,
       txHash: result.hash,
@@ -62,50 +70,42 @@ async function verifyPayment(req, res) {
 
     res.json(result);
   } catch (err) {
-    const statusMap = {
-      TX_FAILED: 400,
-      MISSING_MEMO: 400,
-      INVALID_DESTINATION: 400,
-      UNSUPPORTED_ASSET: 400,
-      DUPLICATE_TX: 409,
-    };
-    const status = statusMap[err.code] || 500;
-    console.error(`[verifyPayment] ${err.code || 'ERROR'}: ${err.message}`);
-    res.status(status).json({ error: err.message, code: err.code || 'INTERNAL_ERROR' });
+    next(err);
   }
 }
 
 // POST /api/payments/sync
-async function syncAllPayments(req, res) {
+async function syncAllPayments(req, res, next) {
   try {
     await syncPayments();
     res.json({ message: 'Sync complete' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(wrapStellarError(err));
   }
 }
 
 // GET /api/payments/:studentId
-async function getStudentPayments(req, res) {
+async function getStudentPayments(req, res, next) {
   try {
     const payments = await Payment.find({ studentId: req.params.studentId }).sort({ confirmedAt: -1 });
     res.json(payments);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 }
 
 // GET /api/payments/accepted-assets
-async function getAcceptedAssets(req, res) {
+async function getAcceptedAssets(req, res, next) {
   try {
-    const assets = Object.values(ACCEPTED_ASSETS).map(a => ({
-      code: a.code,
-      type: a.type,
-      displayName: a.displayName,
-    }));
-    res.json({ assets });
+    res.json({
+      assets: Object.values(ACCEPTED_ASSETS).map(a => ({
+        code: a.code,
+        type: a.type,
+        displayName: a.displayName,
+      })),
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 }
 
