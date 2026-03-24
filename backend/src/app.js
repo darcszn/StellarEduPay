@@ -6,7 +6,9 @@ const mongoose = require('mongoose');
 const studentRoutes = require('./routes/studentRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const feeRoutes = require('./routes/feeRoutes');
+const { runConsistencyCheck } = require('./controllers/consistencyController');
 const { startPolling } = require('./services/transactionService');
+const { startConsistencyScheduler } = require('./services/consistencyScheduler');
 
 const app = express();
 
@@ -17,12 +19,14 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/stellaredup
   .then(() => {
     console.log('MongoDB connected');
     startPolling();
+    startConsistencyScheduler();
   })
   .catch(err => console.error('MongoDB error:', err));
 
 app.use('/api/students', studentRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/fees', feeRoutes);
+app.get('/api/consistency', runConsistencyCheck);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
