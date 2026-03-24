@@ -16,6 +16,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ── Request timeout ───────────────────────────────────────────────────────────
+// If a response has not been sent within REQUEST_TIMEOUT_MS, reply 503.
+app.use((req, res, next) => {
+  res.setTimeout(config.REQUEST_TIMEOUT_MS, () => {
+    const err = new Error(`Request timed out after ${config.REQUEST_TIMEOUT_MS}ms`);
+    err.code = 'REQUEST_TIMEOUT';
+    next(err);
+  });
+  next();
+});
+
 mongoose.connect(config.MONGO_URI)
   .then(() => {
     console.log('MongoDB connected');
@@ -42,6 +53,7 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
     NOT_FOUND: 404,
     VALIDATION_ERROR: 400,
     STELLAR_NETWORK_ERROR: 502,
+    REQUEST_TIMEOUT: 503,
   };
   const status = statusMap[err.code] || err.status || 500;
   console.error(`[${err.code || 'ERROR'}] ${err.message}`);
