@@ -24,10 +24,10 @@ mongoose.connect(config.MONGO_URI)
   })
   .catch(err => console.error('MongoDB error:', err));
 
-app.use('/api/students', studentRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/fees', feeRoutes);
-app.use('/api/reports', reportRoutes);
+app.use('/api/v1/students', studentRoutes);
+app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/fees', feeRoutes);
+app.use('/api/v1/reports', reportRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 

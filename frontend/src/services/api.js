@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api' });
+const api = axios.create({ baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1' });
 
 export const getStudent = (studentId) => api.get(`/students/${studentId}`);
 export const getPaymentInstructions = (studentId) => api.get(`/payments/instructions/${studentId}`);

@@ -133,6 +133,10 @@ async function syncPayments() {
     if (feeValidation.status === 'valid' || feeValidation.status === 'overpaid') {
       await Student.findOneAndUpdate({ studentId: intent.studentId }, { feePaid: true });
     }
+  }
+}
+
+/**
  * Validate a payment amount against the expected fee.
  */
 function validatePaymentAgainstFee(paymentAmount, expectedFee) {

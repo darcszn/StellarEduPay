@@ -73,7 +73,7 @@ const app = require('../backend/src/app');
 
 describe('Full payment flow', () => {
   test('Step 1 — register student', async () => {
-    const res = await request(app).post('/api/students').send({
+    const res = await request(app).post('/api/v1/students').send({
       studentId: 'STU001', name: 'Alice', class: '5A', feeAmount: 200,
     });
     expect(res.status).toBe(201);
@@ -81,7 +81,7 @@ describe('Full payment flow', () => {
   });
 
   test('Step 2 — get payment instructions', async () => {
-    const res = await request(app).get('/api/payments/instructions/STU001');
+    const res = await request(app).get('/api/v1/payments/instructions/STU001');
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('memo', 'STU001');
     expect(res.body).toHaveProperty('note');
@@ -89,13 +89,13 @@ describe('Full payment flow', () => {
   });
 
   test('Step 3 — verify transaction after payment', async () => {
-    const res = await request(app).post('/api/payments/verify').send({ txHash: 'abc123' });
+    const res = await request(app).post('/api/v1/payments/verify').send({ txHash: 'abc123' });
     expect(res.status).toBe(200);
     expect(res.body.feeValidation.status).toBe('valid');
   });
 
   test('Step 4 — payment history reflects the transaction', async () => {
-    const res = await request(app).get('/api/payments/STU001');
+    const res = await request(app).get('/api/v1/payments/STU001');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body[0]).toHaveProperty('txHash', 'abc123');
@@ -105,30 +105,30 @@ describe('Full payment flow', () => {
 // ─── Student API ──────────────────────────────────────────────────────────────
 
 describe('Student API', () => {
-  test('POST /api/students — creates a student', async () => {
-    const res = await request(app).post('/api/students').send({
+  test('POST /api/v1/students — creates a student', async () => {
+    const res = await request(app).post('/api/v1/students').send({
       studentId: 'STU001', name: 'Alice', class: '5A', feeAmount: 200,
     });
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty('studentId', 'STU001');
   });
 
-  test('GET /api/students — returns all students', async () => {
-    const res = await request(app).get('/api/students');
+  test('GET /api/v1/students — returns all students', async () => {
+    const res = await request(app).get('/api/v1/students');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });
 
-  test('GET /api/students/:studentId — returns a student', async () => {
-    const res = await request(app).get('/api/students/STU001');
+  test('GET /api/v1/students/:studentId — returns a student', async () => {
+    const res = await request(app).get('/api/v1/students/STU001');
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ studentId: 'STU001', feeAmount: 200 });
   });
 
-  test('GET /api/students/:studentId — 404 for unknown student', async () => {
+  test('GET /api/v1/students/:studentId — 404 for unknown student', async () => {
     const Student = require('../backend/src/models/studentModel');
     Student.findOne.mockResolvedValueOnce(null);
-    const res = await request(app).get('/api/students/UNKNOWN');
+    const res = await request(app).get('/api/v1/students/UNKNOWN');
     expect(res.status).toBe(404);
   });
 });
@@ -136,22 +136,22 @@ describe('Student API', () => {
 // ─── Payment API ──────────────────────────────────────────────────────────────
 
 describe('Payment API', () => {
-  test('POST /api/payments/sync — returns success', async () => {
-    const res = await request(app).post('/api/payments/sync');
+  test('POST /api/v1/payments/sync — returns success', async () => {
+    const res = await request(app).post('/api/v1/payments/sync');
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('message', 'Sync complete');
   });
 
-  test('POST /api/payments/verify — returns 409 for duplicate transaction', async () => {
+  test('POST /api/v1/payments/verify — returns 409 for duplicate transaction', async () => {
     const Payment = require('../backend/src/models/paymentModel');
     Payment.findOne.mockResolvedValueOnce({ txHash: 'abc123' });
-    const res = await request(app).post('/api/payments/verify').send({ txHash: 'abc123' });
+    const res = await request(app).post('/api/v1/payments/verify').send({ txHash: 'abc123' });
     expect(res.status).toBe(409);
     expect(res.body).toHaveProperty('code', 'DUPLICATE_TX');
   });
 
-  test('GET /api/payments/accepted-assets — returns XLM and USDC', async () => {
-    const res = await request(app).get('/api/payments/accepted-assets');
+  test('GET /api/v1/payments/accepted-assets — returns XLM and USDC', async () => {
+    const res = await request(app).get('/api/v1/payments/accepted-assets');
     expect(res.status).toBe(200);
     expect(res.body.assets.map(a => a.code)).toEqual(expect.arrayContaining(['XLM', 'USDC']));
   });
@@ -160,33 +160,33 @@ describe('Payment API', () => {
 // ─── Fee Structure API ────────────────────────────────────────────────────────
 
 describe('Fee Structure API', () => {
-  test('POST /api/fees — creates a fee structure', async () => {
-    const res = await request(app).post('/api/fees').send({ className: '5A', feeAmount: 200 });
+  test('POST /api/v1/fees — creates a fee structure', async () => {
+    const res = await request(app).post('/api/v1/fees').send({ className: '5A', feeAmount: 200 });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ className: '5A', feeAmount: 200 });
   });
 
-  test('POST /api/fees — 400 when required fields missing', async () => {
-    const res = await request(app).post('/api/fees').send({ description: 'No class' });
+  test('POST /api/v1/fees — 400 when required fields missing', async () => {
+    const res = await request(app).post('/api/v1/fees').send({ description: 'No class' });
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty('errors');
   });
 
-  test('GET /api/fees — returns all fee structures', async () => {
-    const res = await request(app).get('/api/fees');
+  test('GET /api/v1/fees — returns all fee structures', async () => {
+    const res = await request(app).get('/api/v1/fees');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('GET /api/fees/:className — returns fee for class', async () => {
-    const res = await request(app).get('/api/fees/5A');
+  test('GET /api/v1/fees/:className — returns fee for class', async () => {
+    const res = await request(app).get('/api/v1/fees/5A');
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ className: '5A', feeAmount: 200 });
   });
 
-  test('GET /api/fees/:className — 404 for unknown class', async () => {
-    const res = await request(app).get('/api/fees/UNKNOWN');
+  test('GET /api/v1/fees/:className — 404 for unknown class', async () => {
+    const res = await request(app).get('/api/v1/fees/UNKNOWN');
     expect(res.status).toBe(404);
   });
 });
@@ -194,18 +194,18 @@ describe('Fee Structure API', () => {
 // ─── Payment Intent API ───────────────────────────────────────────────────────
 
 describe('Payment Intent API', () => {
-  test('POST /api/payments/intent — creates a payment intent', async () => {
-    const res = await request(app).post('/api/payments/intent').send({ studentId: 'STU001' });
+  test('POST /api/v1/payments/intent — creates a payment intent', async () => {
+    const res = await request(app).post('/api/v1/payments/intent').send({ studentId: 'STU001' });
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty('memo');
     expect(res.body).toHaveProperty('amount', 200);
     expect(res.body).toHaveProperty('studentId', 'STU001');
   });
 
-  test('POST /api/payments/intent — 404 for unknown student', async () => {
+  test('POST /api/v1/payments/intent — 404 for unknown student', async () => {
     const Student = require('../backend/src/models/studentModel');
     Student.findOne.mockResolvedValueOnce(null);
-    const res = await request(app).post('/api/payments/intent').send({ studentId: 'UNKNOWN' });
+    const res = await request(app).post('/api/v1/payments/intent').send({ studentId: 'UNKNOWN' });
     expect(res.status).toBe(404);
   });
 });
