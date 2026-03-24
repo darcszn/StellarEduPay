@@ -53,24 +53,49 @@ async function syncPayments() {
 
     const paymentAmount = parseFloat(payOp.amount);
 
-    // Validate payment amount against the student's defined fee
-    const feeValidation = validatePaymentAgainstFee(paymentAmount, student.feeAmount);
+    // Aggregate all previous payments for this student
+    const previousPayments = await Payment.aggregate([
+      { $match: { studentId: memo } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+    const previousTotal = previousPayments.length ? previousPayments[0].total : 0;
+    const cumulativeTotal = parseFloat((previousTotal + paymentAmount).toFixed(7));
+    const remaining = parseFloat((student.feeAmount - cumulativeTotal).toFixed(7));
+
+    // Determine cumulative validation status
+    let cumulativeStatus;
+    if (cumulativeTotal < student.feeAmount) {
+      cumulativeStatus = 'underpaid';
+    } else if (cumulativeTotal > student.feeAmount) {
+      cumulativeStatus = 'overpaid';
+    } else {
+      cumulativeStatus = 'valid';
+    }
+
+    const excessAmount = cumulativeStatus === 'overpaid'
+      ? parseFloat((cumulativeTotal - student.feeAmount).toFixed(7))
+      : 0;
 
     await Payment.create({
       studentId: memo,
       txHash: tx.hash,
       amount: paymentAmount,
       feeAmount: student.feeAmount,
-      feeValidationStatus: feeValidation.status,
-      excessAmount: feeValidation.excessAmount,
+      feeValidationStatus: cumulativeStatus,
+      excessAmount,
       memo,
       confirmedAt: new Date(tx.created_at),
     });
 
-    // Only mark as paid if the payment meets or exceeds the required fee
-    if (feeValidation.status === 'valid' || feeValidation.status === 'overpaid') {
-      await Student.findOneAndUpdate({ studentId: memo }, { feePaid: true });
-    }
+    // Update student's running totals
+    await Student.findOneAndUpdate(
+      { studentId: memo },
+      {
+        totalPaid: cumulativeTotal,
+        remainingBalance: remaining < 0 ? 0 : remaining,
+        feePaid: cumulativeTotal >= student.feeAmount,
+      }
+    );
   }
 }
 
