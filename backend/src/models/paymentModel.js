@@ -45,9 +45,10 @@ const paymentSchema = new mongoose.Schema(
 paymentSchema.index({ studentId: 1, createdAt: -1 });
 
 paymentSchema.virtual('explorerUrl').get(function() {
-  if (!this.transactionHash) return null;
+  const hash = this.transactionHash || this.txHash;
+  if (!hash) return null;
   const network = process.env.STELLAR_NETWORK === 'mainnet' ? 'public' : 'testnet';
-  return `https://stellar.expert/explorer/${network}/tx/${this.transactionHash}`;
+  return `https://stellar.expert/explorer/${network}/tx/${hash}`;
 });
 
 paymentSchema.pre('save', async function(next) {
