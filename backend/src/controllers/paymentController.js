@@ -348,6 +348,30 @@ async function verifyPayment(req, res, next) {
   }
 }
 
+async function verifyTransactionHash(req, res, next) {
+  try {
+    const { txHash } = req.params;
+
+    const tx = await server.transactions().transaction(txHash).call();
+
+    res.json({
+      hash: tx.hash,
+      successful: tx.successful,
+      created_at: tx.created_at,
+      ledger: tx.ledger_attr || tx.ledger,
+      memo: tx.memo,
+      fee_paid: tx.fee_paid,
+      source_account: tx.source_account,
+      operations_count: tx.operation_count,
+    });
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      return res.status(404).json({ error: 'Transaction not found', code: 'NOT_FOUND' });
+    }
+    next(wrapStellarError(err));
+  }
+}
+
 async function syncAllPayments(req, res, next) {
   try {
     await syncPaymentsForSchool(req.school);
@@ -833,6 +857,7 @@ module.exports = {
   getPaymentInstructions,
   createPaymentIntent,
   verifyPayment,
+  verifyTransactionHash,
   syncAllPayments,
   finalizePayments,
   getStudentPayments,

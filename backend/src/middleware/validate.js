@@ -83,10 +83,22 @@ function validPositiveNumber(val) {
   return Number.isFinite(n) && n > 0;
 }
 
+function validTxHash(hash) {
+  return typeof hash === 'string' && /^[a-f0-9]{64}$/.test(hash);
+}
+
 /** Middleware: validate :studentId URL param */
 function validateStudentIdParam(req, res, next) {
   if (!validStudentId(req.params.studentId)) {
     return res.status(400).json({ errors: [{ field: 'studentId', message: 'Invalid studentId format' }] });
+  }
+  return next();
+}
+
+/** Middleware: validate :txHash URL param */
+function validateTxHashParam(req, res, next) {
+  if (!validTxHash(req.params.txHash)) {
+    return res.status(400).json({ errors: [{ field: 'txHash', message: 'Invalid txHash format' }] });
   }
   return next();
 }
@@ -134,6 +146,7 @@ module.exports = {
 
   // Student / fee validators (manual, backward-compatible)
   validateStudentIdParam,
+  validateTxHashParam,
   validateRegisterStudent,
   validateFeeStructure,
 };
