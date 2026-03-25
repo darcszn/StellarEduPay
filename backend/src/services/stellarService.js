@@ -543,6 +543,32 @@ async function syncPaymentsForSchool(school) {
 
     const feeValidation = validatePaymentAgainstFee(paymentAmount, intent.amount);
 
+    // Skip underpaid single payments — record them as flagged but do not credit
+    if (feeValidation.status === 'underpaid') {
+      logger.warn('Underpaid transaction skipped', {
+        txHash: tx.hash, schoolId, studentId: intent.studentId,
+        paid: paymentAmount, required: intent.amount,
+      });
+      await Payment.create({
+        schoolId,
+        studentId: intent.studentId,
+        txHash: tx.hash,
+        amount: paymentAmount,
+        feeAmount: intent.amount,
+        feeValidationStatus: 'underpaid',
+        excessAmount: 0,
+        status: 'FAILED',
+        memo,
+        senderAddress,
+        isSuspicious: true,
+        suspicionReason: feeValidation.message,
+        ledger: txLedger,
+        confirmationStatus: 'failed',
+        confirmedAt: txDate,
+      });
+      continue;
+    }
+
     await Payment.create({
       schoolId,
       studentId: intent.studentId,
@@ -583,10 +609,6 @@ async function syncPaymentsForSchool(school) {
     }
 
     await PaymentIntent.findByIdAndUpdate(intent._id, { status: 'completed' });
-
-    if (feeValidation.status === 'valid' || feeValidation.status === 'overpaid') {
-      await Student.findOneAndUpdate({ studentId: intent.studentId }, { feePaid: true });
-    }
   }
 }
 
