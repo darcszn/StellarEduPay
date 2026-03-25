@@ -23,6 +23,15 @@ const {
   finalizeConfirmedPayments,
 } = require('../services/stellarService');
 const { queueForRetry } = require('../services/retryService');
+const { SCHOOL_WALLET, ACCEPTED_ASSETS, server } = require('../config/stellarConfig');
+const StellarSdk = require('@stellar/stellar-sdk');
+
+const { SCHOOL_WALLET, ACCEPTED_ASSETS } = require('../config/stellarConfig');
+const { getPaymentLimits } = require('../utils/paymentLimits');
+const crypto = require('crypto');
+
+// Permanent error codes that should NOT be retried
+const PERMANENT_FAIL_CODES = ['TX_FAILED', 'MISSING_MEMO', 'INVALID_DESTINATION', 'UNSUPPORTED_ASSET', 'AMOUNT_TOO_LOW', 'AMOUNT_TOO_HIGH', 'UNDERPAID'];
 const { ACCEPTED_ASSETS } = require('../config/stellarConfig');
 const { getPaymentLimits } = require('../utils/paymentLimits');
 const {
@@ -32,7 +41,7 @@ const {
 const { SCHOOL_WALLET, server } = require('../config/stellarConfig');
 const StellarSdk = require('@stellar/stellar-sdk');
 
-const PERMANENT_FAIL_CODES = ['TX_FAILED', 'MISSING_MEMO', 'INVALID_DESTINATION', 'UNSUPPORTED_ASSET', 'AMOUNT_TOO_LOW', 'AMOUNT_TOO_HIGH'];
+const PERMANENT_FAIL_CODES = ['TX_FAILED', 'MISSING_MEMO', 'INVALID_DESTINATION', 'UNSUPPORTED_ASSET', 'AMOUNT_TOO_LOW', 'AMOUNT_TOO_HIGH', 'UNDERPAID'];
 
 function wrapStellarError(err) {
   if (!err.code) {
@@ -126,7 +135,7 @@ async function submitTransaction(req, res, next) {
     }
 
     // Decode the transaction from the base64 XDR string
-    const tx = new StellarSdk.Transaction(xdr, StellarSdk.Networks.TESTNET); // or networkPassphrase
+    const tx = new StellarSdk.Transaction(xdr, require('../config/stellarConfig').networkPassphrase);
     const transactionHash = tx.hash().toString('hex');
     const memo = tx.memo.value ? tx.memo.value.toString() : null;
 
@@ -268,6 +277,20 @@ async function verifyPayment(req, res, next) {
 
     // Persist the verified payment
     const now = new Date();
+
+    // Reject underpaid transactions — do not record as SUCCESS
+    if (result.feeValidation.status === 'underpaid') {
+      const err = new Error(result.feeValidation.message);
+      err.code = 'UNDERPAID';
+      err.status = 400;
+      err.details = {
+        paid: result.amount,
+        required: result.feeAmount,
+        shortfall: parseFloat((result.feeAmount - result.amount).toFixed(7)),
+      };
+      return next(err);
+    }
+
     await recordPayment({
       schoolId,
       studentId: result.studentId || result.memo,

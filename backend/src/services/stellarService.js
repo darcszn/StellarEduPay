@@ -6,6 +6,7 @@ const Student = require('../models/studentModel');
 const PaymentIntent = require('../models/paymentIntentModel');
 const { validatePaymentAmount } = require('../utils/paymentLimits');
 const { generateReferenceCode } = require('../utils/generateReferenceCode');
+const logger = require('../utils/logger').child('StellarService');
 
 function detectAsset(payOp) {
   const assetType = payOp.asset_type;
@@ -140,6 +141,43 @@ async function detectAbnormalPatterns(senderAddress, paymentAmount, expectedFee,
   }
   return { suspicious: false, reason: null };
 }
+
+/**
+ * Persist a payment record, enforcing uniqueness on txHash.
+ * Throws DUPLICATE_TX if already recorded.
+ * data must include schoolId.
+ */
+async function recordPayment(data) {
+  const exists = await Payment.findOne({ transactionHash: data.transactionHash });
+  if (exists) {
+    const err = new Error(`Transaction ${data.transactionHash} has already been processed`);
+    err.code = 'DUPLICATE_TX';
+    throw err;
+  }
+  if (!data.referenceCode) {
+    data = { ...data, referenceCode: await generateReferenceCode() };
+  }
+  try {
+    return await Payment.create(data);
+  } catch (e) {
+    if (e.code === 11000) {
+      const err = new Error(`Transaction ${data.transactionHash} has already been processed`);
+      err.code = 'DUPLICATE_TX';
+      logger.warn('Duplicate transaction rejected', { txHash: data.transactionHash, schoolId: data.schoolId });
+      throw err;
+    }
+    logger.error('Failed to record payment', { error: e.message, txHash: data.transactionHash, schoolId: data.schoolId });
+    throw e;
+  }
+}
+
+async function verifyTransaction(txHash) {
+  const tx = await server.transactions().transaction(txHash).call();
+  const valid = await extractValidPayment(tx);
+  if (!valid) return null;
+
+  const { payOp, memo, asset } = valid;
+  const amount = normalizeAmount(payOp.amount);
 
 /**
  * Verify a single transaction hash against a specific school wallet.
@@ -286,6 +324,32 @@ async function syncPaymentsForSchool(school) {
 
     const feeValidation = validatePaymentAgainstFee(paymentAmount, intent.amount);
 
+    // Skip underpaid single payments — record them as flagged but do not credit
+    if (feeValidation.status === 'underpaid') {
+      logger.warn('Underpaid transaction skipped', {
+        txHash: tx.hash, schoolId, studentId: intent.studentId,
+        paid: paymentAmount, required: intent.amount,
+      });
+      await Payment.create({
+        schoolId,
+        studentId: intent.studentId,
+        txHash: tx.hash,
+        amount: paymentAmount,
+        feeAmount: intent.amount,
+        feeValidationStatus: 'underpaid',
+        excessAmount: 0,
+        status: 'FAILED',
+        memo,
+        senderAddress,
+        isSuspicious: true,
+        suspicionReason: feeValidation.message,
+        ledger: txLedger,
+        confirmationStatus: 'failed',
+        confirmedAt: txDate,
+      });
+      continue;
+    }
+
     await Payment.create({
       schoolId,
       studentId: intent.studentId,
@@ -304,6 +368,16 @@ async function syncPaymentsForSchool(school) {
       confirmedAt: txDate,
     });
 
+    logger.info('Transaction recorded', {
+      txHash: tx.hash,
+      schoolId,
+      studentId: intent.studentId,
+      amount: paymentAmount,
+      feeValidationStatus: cumulativeStatus,
+      isSuspicious: collision.suspicious,
+      confirmationStatus,
+    });
+
     if (isConfirmed && !collision.suspicious && typeof Student.findOneAndUpdate === 'function') {
       await Student.findOneAndUpdate(
         { schoolId, studentId: intent.studentId },
@@ -316,10 +390,6 @@ async function syncPaymentsForSchool(school) {
     }
 
     await PaymentIntent.findByIdAndUpdate(intent._id, { status: 'completed' });
-
-    if (feeValidation.status === 'valid' || feeValidation.status === 'overpaid') {
-      await Student.findOneAndUpdate({ studentId: intent.studentId }, { feePaid: true });
-    }
   }
 }
 
