@@ -18,11 +18,13 @@ const { initializeRetryQueue, setupMonitoring } = require('./config/retryQueueSe
 const database = require('./config/database');
 const { concurrentPaymentProcessor } = require('./services/concurrentPaymentProcessor');
 const { createConcurrentRequestMiddleware } = require('./middleware/concurrentRequestHandler');
+const { requestLogger } = require('./middleware/requestLogger');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(requestLogger());
 
 // Create concurrent request handling middleware
 const concurrentMiddleware = createConcurrentRequestMiddleware({
