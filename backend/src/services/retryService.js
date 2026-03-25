@@ -181,10 +181,15 @@ function stopRetryWorker() {
   }
 }
 
+function isRetryWorkerRunning() {
+  return _running;
+}
+
 module.exports = {
   queueForRetry,
   processPendingVerifications,
   isStellarReachable,
   startRetryWorker,
   stopRetryWorker,
+  isRetryWorkerRunning,
 };
