@@ -2,11 +2,11 @@
 
 const Student = require('../models/studentModel');
 const FeeStructure = require('../models/feeStructureModel');
+const { get, set, del, KEYS, TTL } = require('../cache');
 const csv = require('csv-parser');
 const { Readable } = require('stream');
 const { get, set, del, KEYS, TTL } = require('../cache');
 
-// POST /api/students
 async function registerStudent(req, res, next) {
   try {
     const { schoolId } = req;
@@ -17,7 +17,6 @@ async function registerStudent(req, res, next) {
       studentId = await generateStudentId();
     }
 
-    // Exact duplicate check by studentId (school-scoped)
     const existingStudent = await Student.findOne({ schoolId, studentId });
     if (existingStudent) {
       const err = new Error(`A student with ID "${studentId}" already exists`);
@@ -25,7 +24,6 @@ async function registerStudent(req, res, next) {
       return next(err);
     }
 
-    // Fuzzy duplicate check (same name + class, case-insensitive, school-scoped)
     const escapedName = name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const similarStudent = await Student.findOne({
       schoolId,
@@ -50,7 +48,6 @@ async function registerStudent(req, res, next) {
 
     const student = await Student.create({ schoolId, studentId, name, class: className, feeAmount: assignedFee });
 
-    // Invalidate student list cache since a new student was added
     del(KEYS.studentsAll());
 
     const response = student.toObject ? student.toObject() : { ...student };
@@ -69,7 +66,6 @@ async function registerStudent(req, res, next) {
   }
 }
 
-// GET /api/students
 async function getAllStudents(req, res, next) {
   try {
     const cacheKey = KEYS.studentsAll();
@@ -84,7 +80,6 @@ async function getAllStudents(req, res, next) {
   }
 }
 
-// GET /api/students/:studentId
 async function getStudent(req, res, next) {
   try {
     const { studentId } = req.params;
@@ -98,13 +93,14 @@ async function getStudent(req, res, next) {
       err.code = 'NOT_FOUND';
       return next(err);
     }
+
+    set(cacheKey, student, TTL.STUDENT);
     res.json(student);
   } catch (err) {
     next(err);
   }
 }
 
-// GET /api/students/summary
 async function getPaymentSummary(req, res, next) {
   try {
     const Payment = require('../models/paymentModel');
@@ -250,6 +246,8 @@ async function bulkImportStudents(req, res, next) {
         results.details.push({ index: i, studentId: row.studentId, status: 'failed', errors: [message] });
       }
     }
+
+    del(KEYS.studentsAll());
 
     res.status(results.failed === results.total ? 400 : 201).json(results);
   } catch (err) {

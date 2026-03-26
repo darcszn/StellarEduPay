@@ -10,13 +10,12 @@ const {
   getPaymentSummary,
   bulkImportStudents,
 } = require('../controllers/studentController');
+const { registerStudent, getAllStudents, getStudent, getPaymentSummary, bulkImportStudents } = require('../controllers/studentController');
 const { validateRegisterStudent, validateStudentIdParam } = require('../middleware/validate');
 const { resolveSchool } = require('../middleware/schoolContext');
 
-// Multer configured for in-memory CSV uploads (max 5 MB)
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-// All student routes require school context
 router.use(resolveSchool);
 
 router.post('/',          validateRegisterStudent, registerStudent);

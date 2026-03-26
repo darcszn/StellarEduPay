@@ -123,6 +123,30 @@ jest.mock('../backend/src/services/currencyConversionService', () => ({
   _getRates: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock('../backend/src/config/stellarConfig', () => ({
+  SCHOOL_WALLET: 'GTEST123',
+  ACCEPTED_ASSETS: {
+    XLM:  { code: 'XLM',  type: 'native',          issuer: null },
+    USDC: { code: 'USDC', type: 'credit_alphanum4', issuer: 'GISSUER' },
+  },
+  server: {
+    transactions: () => ({
+      transaction: (txHash) => ({
+        call: async () => ({
+          hash: txHash,
+          successful: true,
+          created_at: new Date().toISOString(),
+          ledger_attr: 12345,
+          memo: 'test-memo',
+          fee_paid: 100,
+          source_account: 'GACCOUNT',
+          operation_count: 1,
+        }),
+      }),
+    }),
+  },
+}));
+
 jest.mock('../backend/src/services/stellarService', () => ({
   syncPayments: jest.fn().mockResolvedValue(undefined),
   syncPaymentsForSchool: jest.fn().mockResolvedValue(undefined),
@@ -484,5 +508,27 @@ describe('Idempotency', () => {
   test('POST /api/payments/sync — does NOT require Idempotency-Key', async () => {
     const res = await testApi.post('/api/payments/sync');
     expect(res.status).toBe(200);
+  });
+
+  test('GET /api/payments/verify/:txHash — returns transaction details', async () => {
+    const txHash = 'a'.repeat(64);
+    const res = await request(app).get(`/api/payments/verify/${txHash}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      hash: txHash,
+      successful: true,
+      created_at: expect.any(String),
+      ledger: 12345,
+      memo: 'test-memo',
+      fee_paid: 100,
+      source_account: 'GACCOUNT',
+      operations_count: 1,
+    });
+  });
+
+  test('GET /api/payments/verify/:txHash — 400 for invalid txHash', async () => {
+    const res = await request(app).get('/api/payments/verify/invalid');
+    expect(res.status).toBe(400);
+    expect(res.body.errors[0].field).toBe('txHash');
   });
 });

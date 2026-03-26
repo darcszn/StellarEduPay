@@ -7,6 +7,7 @@ const {
   createPaymentIntent,
   verifyPayment,
   submitTransaction,
+  verifyTransactionHash,
   syncAllPayments,
   finalizePayments,
   getStudentPayments,
@@ -27,12 +28,16 @@ const {
 
 const {
   validateStudentIdParam,
+  validateTxHashParam,
   validateCreatePaymentIntent,
   validateSubmitTransaction,
   validateVerifyPayment,
 } = require('../middleware/validate');
 const { resolveSchool } = require('../middleware/schoolContext');
 const idempotency = require('../middleware/idempotency');
+
+// Verify transaction hash (does not require school context)
+router.get('/verify/:txHash', validateTxHashParam, verifyTransactionHash);
 
 // All payment routes require school context
 router.use(resolveSchool);
