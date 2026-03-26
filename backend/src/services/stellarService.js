@@ -6,6 +6,7 @@ const Student = require('../models/studentModel');
 const PaymentIntent = require('../models/paymentIntentModel');
 const { validatePaymentAmount } = require('../utils/paymentLimits');
 const { generateReferenceCode } = require('../utils/generateReferenceCode');
+const { withStellarRetry } = require('../utils/withStellarRetry');
 const logger = require('../utils/logger').child('StellarService');
 
 function detectAsset(payOp) {
@@ -32,7 +33,10 @@ async function extractValidPayment(tx, walletAddress) {
   const memo = tx.memo ? tx.memo.trim() : null;
   if (!memo) return null;
 
-  const ops = await tx.operations();
+  const ops = await withStellarRetry(
+    () => tx.operations(),
+    { label: 'extractValidPayment.operations' }
+  );
   const payOp = ops.records.find(op => op.type === 'payment' && op.to === walletAddress);
   if (!payOp) return null;
 
@@ -66,7 +70,10 @@ function validatePaymentAgainstFee(paymentAmount, expectedFee) {
 }
 
 async function checkConfirmationStatus(txLedger) {
-  const latestLedger = await server.ledgers().order('desc').limit(1).call();
+  const latestLedger = await withStellarRetry(
+    () => server.ledgers().order('desc').limit(1).call(),
+    { label: 'checkConfirmationStatus' }
+  );
   const latestSequence = latestLedger.records[0].sequence;
   return (latestSequence - txLedger) >= CONFIRMATION_THRESHOLD;
 }
@@ -188,7 +195,10 @@ async function verifyTransaction(txHash) {
  * @returns {object|null} Verified transaction details, or null if no valid payment found
  */
 async function verifyTransaction(txHash, walletAddress) {
-  const tx = await server.transactions().transaction(txHash).call();
+  const tx = await withStellarRetry(
+    () => server.transactions().transaction(txHash).call(),
+    { label: 'verifyTransaction' }
+  );
 
   // 1. Validate transaction success
   if (tx.successful === false) {
@@ -204,7 +214,10 @@ async function verifyTransaction(txHash, walletAddress) {
     throw err;
   }
 
-  const ops = await tx.operations();
+  const ops = await withStellarRetry(
+    () => tx.operations(),
+    { label: 'verifyTransaction.operations' }
+  );
   const payOp = ops.records.find(op => op.type === 'payment' && op.to === walletAddress);
   if (!payOp) {
     const err = new Error(`No payment operation found targeting the school wallet (${walletAddress})`);
@@ -267,12 +280,15 @@ async function verifyTransaction(txHash, walletAddress) {
 async function syncPaymentsForSchool(school) {
   const { schoolId, stellarAddress } = school;
 
-  const transactions = await server
-    .transactions()
-    .forAccount(stellarAddress)
-    .order('desc')
-    .limit(20)
-    .call();
+  const transactions = await withStellarRetry(
+    () => server
+      .transactions()
+      .forAccount(stellarAddress)
+      .order('desc')
+      .limit(20)
+      .call(),
+    { label: `syncPaymentsForSchool(${schoolId})` }
+  );
 
   for (const tx of transactions.records) {
     const existing = await Payment.findOne({ txHash: tx.hash });
