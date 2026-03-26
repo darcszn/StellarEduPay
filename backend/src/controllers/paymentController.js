@@ -73,6 +73,13 @@ const PERMANENT_FAIL_CODES = [
   "UNDERPAID",
 ];
 
+function getExplorerUrl(txHash) {
+  if (!txHash) return null;
+  const network =
+    process.env.STELLAR_NETWORK === "mainnet" ? "public" : "testnet";
+  return `https://stellar.expert/explorer/${network}/tx/${txHash}`;
+}
+
 function wrapStellarError(err) {
   if (!err.code) {
     err.code = "STELLAR_NETWORK_ERROR";
@@ -315,6 +322,8 @@ async function submitTransaction(req, res, next) {
     const submitNetwork = process.env.STELLAR_NETWORK === 'mainnet' ? 'public' : 'testnet';
     res.json({
       verified: true,
+      hash: transactionHash,
+      explorerUrl: getExplorerUrl(transactionHash),
       hash: normalizedHash,
       ledger: txResponse.ledger,
       status: "SUCCESS",
@@ -502,6 +511,7 @@ async function verifyPayment(req, res, next) {
     res.json({
       verified: true,
       hash: result.hash,
+      explorerUrl: getExplorerUrl(result.hash),
       memo: result.memo,
       studentId: result.studentId || result.memo,
       amount: result.amount,
@@ -927,6 +937,13 @@ async function getAllPayments(req, res, next) {
       Payment.countDocuments(filter)
     ]);
 
+    const enrichedPayments = payments.map((p) => ({
+      ...p,
+      explorerUrl: getExplorerUrl(p.transactionHash || p.txHash),
+    }));
+
+    res.json({
+      payments: enrichedPayments,
     const network = process.env.STELLAR_NETWORK === 'mainnet' ? 'public' : 'testnet';
     const enrichedPayments = payments.map(p => {
       const hash = p.transactionHash || p.txHash;

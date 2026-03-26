@@ -12,7 +12,7 @@ export default function TransactionCard({ payment, schoolId, schoolSlug }) {
   const {
     txHash,
     amount,
-    assetCode = 'XLM',
+    assetCode = "XLM",
     confirmedAt,
     studentId,
     localCurrency,
@@ -28,11 +28,16 @@ export default function TransactionCard({ payment, schoolId, schoolSlug }) {
   const [error, setError]                 = useState(null);
 
   const formattedAmount = `${parseFloat(amount).toFixed(7)} ${assetCode}`;
-  const formattedDate   = confirmedAt ? new Date(confirmedAt).toLocaleString() : '—';
+  const formattedDate = confirmedAt
+    ? new Date(confirmedAt).toLocaleString()
+    : "—";
 
-  const hasLocal  = localCurrency?.available && localCurrency?.amount != null;
-  const rateTime  = localCurrency?.rateTimestamp
-    ? new Date(localCurrency.rateTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const hasLocal = localCurrency?.available && localCurrency?.amount != null;
+  const rateTime = localCurrency?.rateTimestamp
+    ? new Date(localCurrency.rateTimestamp).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : null;
 
   const disputeStatusColor = {
@@ -67,24 +72,32 @@ export default function TransactionCard({ payment, schoolId, schoolSlug }) {
   return (
     <div
       style={{
+        border: "1px solid #ddd",
         border: disputeState ? '1px solid #e65100' : '1px solid #ddd',
         borderRadius: 8,
-        padding: '0.75rem 1rem',
-        marginBottom: '0.5rem',
-        fontFamily: 'sans-serif',
+        padding: "0.75rem 1rem",
+        marginBottom: "0.5rem",
+        fontFamily: "sans-serif",
       }}
     >
       {/* Amount row */}
       <p style={{ margin: 0 }}>
-        <strong>Amount:</strong>{' '}
-        {formattedAmount}
+        <strong>Amount:</strong> {formattedAmount}
         {hasLocal && (
-          <span style={{ marginLeft: '0.5rem', color: '#2e7d32', fontSize: '0.9rem' }}>
+          <span
+            style={{
+              marginLeft: "0.5rem",
+              color: "#2e7d32",
+              fontSize: "0.9rem",
+            }}
+          >
             ≈ {localCurrency.amount.toFixed(2)} {localCurrency.currency}
           </span>
         )}
         {!hasLocal && localCurrency && (
-          <span style={{ marginLeft: '0.5rem', color: '#999', fontSize: '0.8rem' }}>
+          <span
+            style={{ marginLeft: "0.5rem", color: "#999", fontSize: "0.8rem" }}
+          >
             (rate unavailable)
           </span>
         )}
@@ -92,11 +105,15 @@ export default function TransactionCard({ payment, schoolId, schoolSlug }) {
 
       {/* Rate freshness */}
       {hasLocal && rateTime && (
-        <p style={{ margin: '0.1rem 0 0', fontSize: '0.75rem', color: '#aaa' }}>
+        <p style={{ margin: "0.1rem 0 0", fontSize: "0.75rem", color: "#aaa" }}>
           Rate as of {rateTime}
         </p>
       )}
 
+      {/* Transaction hash */}
+      <p style={{ margin: "0.25rem 0", fontSize: "0.85rem", color: "#555" }}>
+        <strong>Tx:</strong>{" "}
+        {explorerUrl ? (
       {/* Transaction hash + explorer link */}
       <p style={{ margin: '0.25rem 0', fontSize: '0.85rem', color: '#555' }}>
         <strong>Tx:</strong>{' '}
@@ -106,6 +123,18 @@ export default function TransactionCard({ payment, schoolId, schoolSlug }) {
             href={explorerUrl}
             target="_blank"
             rel="noopener noreferrer"
+            style={{
+              wordBreak: "break-all",
+              fontSize: "0.8rem",
+              color: "#1a73e8",
+            }}
+          >
+            {txHash}
+          </a>
+        ) : (
+          <code style={{ wordBreak: "break-all", fontSize: "0.8rem" }}>
+            {txHash}
+          </code>
             style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#1565c0' }}
             aria-label="View transaction on Stellar Expert"
           >
@@ -115,7 +144,7 @@ export default function TransactionCard({ payment, schoolId, schoolSlug }) {
       </p>
 
       {/* Date + student */}
-      <p style={{ margin: 0, fontSize: '0.85rem', color: '#888' }}>
+      <p style={{ margin: 0, fontSize: "0.85rem", color: "#888" }}>
         {formattedDate} — Student {studentId}
       </p>
 
