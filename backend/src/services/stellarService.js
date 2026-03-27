@@ -767,6 +767,8 @@ async function syncPaymentsForSchool(school) {
       );
     }
   }
+
+  await SystemConfig.set(`lastSyncAt:${schoolId}`, new Date().toISOString());
 }
 
 async function finalizeConfirmedPayments(schoolId) {

@@ -410,6 +410,16 @@ async function syncAllPayments(req, res, next) {
   }
 }
 
+async function getSyncStatus(req, res, next) {
+  try {
+    const SystemConfig = require('../models/systemConfigModel');
+    const lastSyncAt = await SystemConfig.get(`lastSyncAt:${req.schoolId}`);
+    res.json({ lastSyncAt: lastSyncAt || null, status: lastSyncAt ? 'synced' : 'never_synced' });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function finalizePayments(req, res, next) {
   try {
     await finalizeConfirmedPayments(req.schoolId);
@@ -881,6 +891,7 @@ module.exports = {
   verifyTransactionHash,
   submitTransaction,
   syncAllPayments,
+  getSyncStatus,
   finalizePayments,
   getStudentPayments,
   getAllPayments,                    // ← Updated with proper pagination

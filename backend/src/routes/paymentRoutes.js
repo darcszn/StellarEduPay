@@ -10,6 +10,7 @@ const {
   submitTransaction,
   verifyTransactionHash,
   syncAllPayments,
+  getSyncStatus,
   finalizePayments,
   getStudentPayments,
   getAcceptedAssets,
@@ -47,17 +48,31 @@ router.get('/verify/:txHash', validateTxHashParam, verifyTransactionHash);
 // All routes below require school context
 router.use(resolveSchool);
 
-// ── Static GET routes (before parameterised ones) ─────────────────────────────
-router.get('/',                        getAllPayments);
-router.get('/accepted-assets',         getAcceptedAssets);
-router.get('/limits',                  getPaymentLimitsEndpoint);
-router.get('/events',                  streamPaymentEvents);
-router.get('/overpayments',            getOverpayments);
-router.get('/suspicious',              getSuspiciousPayments);
-router.get('/pending',                 getPendingPayments);
-router.get('/retry-queue',             getRetryQueue);
-router.get('/rates',                   getExchangeRates);
-router.get('/dlq',                     getDeadLetterJobs);
+// ── Static routes (before parameterized ones) ────────────────────────────────
+// ── Static routes (before parameterised ones) ────────────────────────────────
+router.get('/',                              getAllPayments);
+router.get('/accepted-assets',               getAcceptedAssets);
+router.get('/limits',                        getPaymentLimitsEndpoint);
+router.get('/sync/status',                   getSyncStatus);
+router.get('/events',                        streamPaymentEvents);
+router.get('/overpayments',                  getOverpayments);
+router.get('/suspicious',                    getSuspiciousPayments);
+router.get('/pending',                       getPendingPayments);
+router.get('/retry-queue',                   getRetryQueue);
+router.get('/rates',                         getExchangeRates);
+
+// ── Collection routes ────────────────────────────────────────────────────────
+router.get('/',                              getAllPayments);
+
+// ── Dead Letter Queue endpoints ──────────────────────────────────────────────
+router.get('/dlq',                           getDeadLetterJobs);
+router.post('/dlq/:id/retry',                retryDeadLetterJob);
+
+// ── POST routes (mutating operations) ────────────────────────────────────────
+router.post('/intent',                       idempotency, validateCreatePaymentIntent, createPaymentIntent);
+router.post('/verify',                       strictLimiter, idempotency, validateVerifyPayment, verifyPayment);
+router.post('/sync',                         strictLimiter, requireAdminAuth, syncAllPayments);
+router.post('/finalize',                     requireAdminAuth, finalizePayments);
 
 // ── POST routes ───────────────────────────────────────────────────────────────
 router.post('/intent',                 idempotency, validateCreatePaymentIntent, createPaymentIntent);
