@@ -241,6 +241,40 @@ describe('Student API', () => {
     expect(res.body).toHaveProperty('studentId', 'STU001');
   });
 
+  test('POST /api/students — 400 when name is missing', async () => {
+    const res = await testApi.post('/api/students').send({ studentId: 'STU002', class: '5A', feeAmount: 200 });
+    expect(res.status).toBe(400);
+    expect(res.body.errors.some(e => e.field === 'name')).toBe(true);
+  });
+
+  test('POST /api/students — 400 when class is missing', async () => {
+    const res = await testApi.post('/api/students').send({ studentId: 'STU002', name: 'Bob', feeAmount: 200 });
+    expect(res.status).toBe(400);
+    expect(res.body.errors.some(e => e.field === 'class')).toBe(true);
+  });
+
+  test('POST /api/students — 400 when studentId format is invalid', async () => {
+    const res = await testApi.post('/api/students').send({ studentId: '!!', name: 'Bob', class: '5A' });
+    expect(res.status).toBe(400);
+    expect(res.body.errors.some(e => e.field === 'studentId')).toBe(true);
+  });
+
+  test('POST /api/students — 400 when feeAmount is not a positive number', async () => {
+    const res = await testApi.post('/api/students').send({ name: 'Bob', class: '5A', feeAmount: -10 });
+    expect(res.status).toBe(400);
+    expect(res.body.errors.some(e => e.field === 'feeAmount')).toBe(true);
+  });
+
+  test('POST /api/students — sanitizes whitespace from name and class', async () => {
+    const Student = require('../backend/src/models/studentModel');
+    Student.findOne.mockResolvedValueOnce(null);
+    Student.findOne.mockResolvedValueOnce(null);
+    const res = await testApi.post('/api/students').send({
+      studentId: 'STU003', name: '  Carol  ', class: '  5A  ', feeAmount: 200,
+    });
+    expect(res.status).toBe(201);
+  });
+
   test('GET /api/students — returns all students', async () => {
     const res = await testApi.get('/api/students');
     expect(res.status).toBe(200);
