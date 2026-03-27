@@ -37,6 +37,8 @@ const {
 } = require('../middleware/validate');
 const { resolveSchool } = require('../middleware/schoolContext');
 const idempotency = require('../middleware/idempotency');
+const { requireAdminAuth } = require('../middleware/auth');
+const { strictLimiter, generalLimiter } = require('../middleware/rateLimiter');
 
 // Verify transaction hash (does not require school context)
 router.get('/verify/:txHash', validateTxHashParam, verifyTransactionHash);
@@ -65,9 +67,9 @@ router.post('/dlq/:id/retry',                retryDeadLetterJob);
 
 // ── POST routes (mutating operations) ────────────────────────────────────────
 router.post('/intent',                       idempotency, validateCreatePaymentIntent, createPaymentIntent);
-router.post('/verify',                       idempotency, validateVerifyPayment, verifyPayment);
-router.post('/sync',                         syncAllPayments);
-router.post('/finalize',                     finalizePayments);
+router.post('/verify',                       strictLimiter, idempotency, validateVerifyPayment, verifyPayment);
+router.post('/sync',                         strictLimiter, requireAdminAuth, syncAllPayments);
+router.post('/finalize',                     requireAdminAuth, finalizePayments);
 
 // ── Parameterized routes (must come last) ────────────────────────────────────
 router.get('/dlq',                           getDeadLetterJobs);
