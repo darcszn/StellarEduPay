@@ -86,6 +86,22 @@ async function getAllStudents(req, res, next) {
   }
 }
 
+async function deleteStudent(req, res, next) {
+  try {
+    const { studentId } = req.params;
+    const student = await Student.findOneAndDelete({ schoolId: req.schoolId, studentId });
+    if (!student) {
+      const err = new Error('Student not found');
+      err.code = 'NOT_FOUND';
+      return next(err);
+    }
+    del(KEYS.student(studentId));
+    res.json({ message: `Student ${studentId} deleted` });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function updateStudent(req, res, next) {
   try {
     const { studentId } = req.params;
@@ -305,4 +321,4 @@ async function getOverdueStudents(req, res, next) {
   }
 }
 
-module.exports = { registerStudent, getAllStudents, getStudent, updateStudent, getPaymentSummary, bulkImportStudents, getOverdueStudents };
+module.exports = { registerStudent, getAllStudents, getStudent, updateStudent, deleteStudent, getPaymentSummary, bulkImportStudents, getOverdueStudents };
