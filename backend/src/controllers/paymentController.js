@@ -661,7 +661,7 @@ async function getPendingPayments(req, res, next) {
 }
 
 // GET /api/payments/retry-queue
-async function getRetryQueue(req, res) {
+async function getRetryQueue(req, res, next) {
   try {
     if (
       !PendingVerification ||
@@ -694,7 +694,7 @@ async function getRetryQueue(req, res) {
       recently_resolved: { count: resolved.length, items: resolved },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 }
 

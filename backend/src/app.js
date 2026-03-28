@@ -20,7 +20,7 @@ const { startConsistencyScheduler }                                   = require(
 const { startReminderScheduler, stopReminderScheduler }               = require('./services/reminderService');
 const { startWorker: startTxQueueWorker, stopWorker: stopTxQueueWorker } = require('./services/transactionQueueService');
 const { initializeRetryQueue, setupMonitoring }                       = require('./config/retryQueueSetup');
-const { notFoundHandler }                                             = require('./middleware/errorHandler');
+const { notFoundHandler, globalErrorHandler }                         = require('./middleware/errorHandler');
 const { requestLogger }                                               = require('./middleware/requestLogger');
 const { createConcurrentRequestMiddleware }                           = require('./middleware/concurrentRequestHandler');
 const { runConsistencyCheck }                                         = require('./controllers/consistencyController');
@@ -59,28 +59,7 @@ app.get('/health', healthCheck);
 
 // ── Error handling ────────────────────────────────────────────────────────────
 app.use(notFoundHandler);
-app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
-  const statusMap = {
-    TX_FAILED:               400,
-    MISSING_MEMO:            400,
-    INVALID_DESTINATION:     400,
-    UNSUPPORTED_ASSET:       400,
-    VALIDATION_ERROR:        400,
-    UNDERPAID:               400,
-    MISSING_SCHOOL_CONTEXT:  400,
-    MISSING_IDEMPOTENCY_KEY: 400,
-    DUPLICATE_TX:            409,
-    DUPLICATE_SCHOOL:        409,
-    DUPLICATE_STUDENT:       409,
-    NOT_FOUND:               404,
-    SCHOOL_NOT_FOUND:        404,
-    STELLAR_NETWORK_ERROR:   502,
-    REQUEST_TIMEOUT:         503,
-  };
-  const status = statusMap[err.code] || err.status || 500;
-  logger.error('Request error', { code: err.code || 'INTERNAL_ERROR', message: err.message, status });
-  res.status(status).json({ error: err.message, code: err.code || 'INTERNAL_ERROR' });
-});
+app.use(globalErrorHandler);
 
 // ── Database + service startup ────────────────────────────────────────────────
 mongoose.connect(config.MONGO_URI)
