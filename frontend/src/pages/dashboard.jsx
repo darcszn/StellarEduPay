@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import SyncButton from '../components/SyncButton';
-import { getSyncStatus } from '../services/api';
+import { getSyncStatus, getStudents } from '../services/api';
 
 function timeAgo(isoString) {
   if (!isoString) return 'Never';
@@ -42,6 +42,18 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    setLoading(true);
+    getStudents(page, PAGE_SIZE)
+      .then(({ data }) => {
+        setStudents(data.students);
+        setTotal(data.total);
+        setPages(data.pages);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [page]);
+
   function handleSyncComplete(data) {
     setLastSyncAt(new Date().toISOString());
     setSyncMessage(data?.message || 'Sync complete.');
@@ -66,7 +78,7 @@ export default function Dashboard() {
   return (
     <>
       <Navbar />
-      <div style={{ maxWidth: 800, margin: '2rem auto', fontFamily: 'sans-serif', padding: '0 1rem' }}>
+      <div style={{ maxWidth: 900, margin: '2rem auto', fontFamily: 'sans-serif', padding: '0 1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0 }}>Admin Dashboard</h1>
           <SyncButton onSyncComplete={handleSyncComplete} lastSyncTime={lastSyncAt} />
