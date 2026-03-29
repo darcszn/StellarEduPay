@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div className="container text-center">
+    <div style={{ textAlign: 'center' }}>
       <Head>
         <title>StellarEduPay</title>
         <meta name="description" content="Transparent, instant school fee payments on the Stellar blockchain. Eliminate manual reconciliation and get instant proof of payment." />

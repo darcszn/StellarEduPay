@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import Navbar from "../components/Navbar";
 import SyncButton from "../components/SyncButton";
 import { getSyncStatus, getPaymentSummary } from "../services/api";
 
@@ -125,7 +124,6 @@ export default function Dashboard() {
 
   return (
     <>
-      <Navbar />
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.75rem; }
@@ -138,14 +136,7 @@ export default function Dashboard() {
         .summary-skeleton { height: 1.6rem; width: 60%; background: #e0e0e0; border-radius: 4px; animation: pulse 1.5s infinite; }
       `}</style>
 
-      <div
-        style={{
-          maxWidth: 960,
-          margin: "2rem auto",
-          fontFamily: "sans-serif",
-          padding: "0 1rem",
-        }}
-      >
+      <div>
         <div
           style={{
             display: "flex",
