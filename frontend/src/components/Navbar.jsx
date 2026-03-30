@@ -1,6 +1,7 @@
-import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/router";
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import TestnetBanner from './TestnetBanner';
 
 const LINKS = [
   { href: "/", label: "Home" },
@@ -26,15 +27,9 @@ export default function Navbar() {
         }
       `}</style>
 
-      <nav
-        style={{
-          background: "#1a1a2e",
-          padding: "0.75rem 2rem",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
+      <TestnetBanner />
+
+      <nav style={{ background: '#1a1a2e', padding: '0.75rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {/* Brand */}
         <Link
           href="/"

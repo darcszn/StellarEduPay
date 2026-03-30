@@ -50,6 +50,7 @@ export default function PaymentForm() {
   const rateTime = local?.rateTimestamp
     ? new Date(local.rateTimestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : null;
+  const isTestnet = process.env.NEXT_PUBLIC_STELLAR_NETWORK === 'testnet';
 
   return (
     <div className="container-sm">
@@ -112,6 +113,12 @@ export default function PaymentForm() {
             <strong>Status:</strong> {student.feePaid ? "✅ Paid" : "❌ Unpaid"}
           </p>
           <hr />
+
+          {isTestnet && (
+            <div className="badge-warning mb-1">
+              ⚠️ <strong>TESTNET MODE:</strong> Use only testnet XLM. Do not send real funds.
+            </div>
+          )}
 
           <div className="mb-1">
             <label htmlFor="walletAddress" className="input-label mb-0-25">
