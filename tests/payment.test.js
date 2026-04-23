@@ -232,8 +232,12 @@ describe('Full payment flow', () => {
   test('Step 4 — payment history reflects the transaction', async () => {
     const res = await testApi.get('/api/payments/STU001');
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body[0]).toHaveProperty('txHash', 'abc123');
+    expect(res.body).toHaveProperty('payments');
+    expect(res.body).toHaveProperty('total');
+    expect(res.body).toHaveProperty('page');
+    expect(res.body).toHaveProperty('pages');
+    expect(Array.isArray(res.body.payments)).toBe(true);
+    expect(res.body.payments[0]).toHaveProperty('txHash', 'abc123');
   });
 });
 

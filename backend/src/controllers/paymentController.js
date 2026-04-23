@@ -643,7 +643,7 @@ async function getStudentPayments(req, res, next) {
 
     // Pagination parameters
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
     const skip = (page - 1) * limit;
 
     // Get total count for pagination metadata
