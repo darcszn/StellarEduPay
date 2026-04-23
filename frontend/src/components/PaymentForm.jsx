@@ -1,4 +1,6 @@
 import { useState, useRef } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import { generateStellarPaymentUri } from "../utils/stellarUri";
 import { getStudent, getPaymentInstructions, getStudentPayments } from "../services/api";
 
 const STATUS_STYLE = {
@@ -127,6 +129,22 @@ export default function PaymentForm() {
                 </button>
               </div>
             </div>
+
+            {/* QR code for mobile wallet scanning (SEP-0007 URI) */}
+            {instructions.walletAddress && instructions.memo && (
+              <div style={{ marginTop: "1.25rem", textAlign: "center" }}>
+                <span className="pf-label" style={{ display: "block", marginBottom: "0.6rem" }}>Scan with Stellar Wallet</span>
+                <QRCodeSVG
+                  value={generateStellarPaymentUri({
+                    destination: instructions.walletAddress,
+                    amount: instructions.feeAmount ?? student.feeAmount ?? 0,
+                    memo: instructions.memo,
+                  })}
+                  size={160}
+                  aria-label="Stellar payment QR code"
+                />
+              </div>
+            )}
 
             {instructions.acceptedAssets?.length > 0 && (
               <p style={{ marginTop: "1rem", fontSize: "0.8rem", color: "var(--muted)" }}>
